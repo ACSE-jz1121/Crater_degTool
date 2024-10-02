@@ -5,7 +5,7 @@ from glob import glob
 import random
 
 # Load all crater images from the specified folder and convert paths to absolute
-image_folder = "100_images\extracted_images"
+image_folder = "100_images"
 crater_images = [os.path.abspath(path) for path in glob(os.path.join(image_folder, "*.jpg"))]
 print('Crater images list:', crater_images)
 
