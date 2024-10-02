@@ -11,10 +11,10 @@ print('Crater images list:', crater_images)
 
 # Paths to demonstration images for degradation levels 1 to 4
 demo_image_paths = [
-    os.path.abspath(r"C:/Users/jamil/OneDrive/desktop/PhD/Phase_2/gui/classification/demonstration_img/1.jpg"),
-    os.path.abspath(r"C:/Users/jamil/OneDrive/desktop/PhD/Phase_2/gui/classification/demonstration_img/2.jpg"),
-    os.path.abspath(r"C:/Users/jamil/OneDrive/desktop/PhD/Phase_2/gui/classification/demonstration_img/3.jpg"),
-    os.path.abspath(r"C:/Users/jamil/OneDrive/desktop/PhD\Phase_2\gui\classification\demonstration_img\4.jpg")
+    os.path.abspath("demonstration_img/1.jpg"),
+    os.path.abspath("demonstration_img/2.jpg"),
+    os.path.abspath("demonstration_img/3.jpg"),
+    os.path.abspath("demonstration_img/4.jpg")
 ]
 
 # Global variables for the main window, image labels, and counters
