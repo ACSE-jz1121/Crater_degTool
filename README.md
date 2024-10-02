@@ -3,7 +3,7 @@ This is the tool to rank crater degradation level
 
 # Crater Degradation Tool Instructions
 
-1. Clone this tool into your local repository: git clone https://github.com/ACSE-jz1121/Crater_degTool.git
+1. Clone this tool into your local repository: `git clone https://github.com/ACSE-jz1121/Crater_degTool.git`
 3. Open the terminal and set it to PowerShell.
 4. Type `pip install -r requirements.txt` to install the required dependencies.
 5. Type `python tournament_analysis.py` to activate the GUI.
