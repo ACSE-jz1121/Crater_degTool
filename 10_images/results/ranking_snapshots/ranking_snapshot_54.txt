@@ -1,0 +1,10 @@
+1,1_Aeolis_848_0_-30_180_135_medium.jpg,24
+2,1_Aeolis_1392_0_-30_180_135_medium.jpg,18
+3,4_Elysium_989_30_0_180_135_medium.jpg,13
+4,4_Elysium_220_30_0_180_135_medium.jpg,11
+5,1_Aeolis_822_0_-30_180_135_medium.jpg,10
+6,3_Aeolis_1960_0_-30_180_135_medium.jpg,10
+7,1_Aeolis_46_0_-30_180_135_medium.jpg,8
+8,3_Aeolis_2859_0_-30_180_135_medium.jpg,8
+9,3_Aeolis_2766_0_-30_180_135_medium.jpg,6
+10,4_Elysium_942_30_0_180_135_medium.jpg,0

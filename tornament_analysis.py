@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 from scipy.stats import spearmanr
 
 # Load all crater images from the specified folder and convert paths to absolute
-image_folder = "100_images"
+image_folder = "600_images"
 crater_images = [os.path.abspath(path) for path in glob(os.path.join(image_folder, "*.jpg"))]
 print('Crater images list loaded. Total images:', len(crater_images))
 
