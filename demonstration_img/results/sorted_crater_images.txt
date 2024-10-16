@@ -1,0 +1,6 @@
+Total Button Presses: 27
+
+2.jpg - Score: 30 - Samples: 17 - Wins: 15 - Losses: 2 - Draws: 0
+1.jpg - Score: 18 - Samples: 10 - Wins: 9 - Losses: 1 - Draws: 0
+3.jpg - Score: 6 - Samples: 12 - Wins: 3 - Losses: 9 - Draws: 0
+4.jpg - Score: 0 - Samples: 15 - Wins: 0 - Losses: 15 - Draws: 0

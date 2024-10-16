@@ -3,11 +3,16 @@ from PIL import Image, ImageTk
 import os
 from glob import glob
 import random
+import matplotlib
+matplotlib.use("TkAgg")  # Use TkAgg backend for matplotlib
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+from scipy.stats import spearmanr
 
 # Load all crater images from the specified folder and convert paths to absolute
 image_folder = "100_images"
 crater_images = [os.path.abspath(path) for path in glob(os.path.join(image_folder, "*.jpg"))]
-print('Crater images list:', crater_images)
+print('Crater images list loaded. Total images:', len(crater_images))
 
 # Paths to demonstration images for degradation levels 1 to 4
 demo_image_paths = [
@@ -26,6 +31,10 @@ button_press_count = 0  # Counter to track the number of button presses
 comparison_history = []  # List of dictionaries with comparison details
 current_comparison_index = -1  # Index in the comparison history
 
+# Initialize variables to store ranking history and variability
+ranking_history = []
+variability_list = []
+
 # Function to load existing data from a file
 def load_existing_data(file_path):
     existing_scores = {image: 0 for image in crater_images}
@@ -36,6 +45,7 @@ def load_existing_data(file_path):
     total_button_presses = 0
 
     if os.path.exists(file_path):
+        print(f"Loading existing data from {file_path}")
         with open(file_path, "r") as file:
             for line in file:
                 try:
@@ -64,14 +74,25 @@ def load_existing_data(file_path):
                     else:
                         continue
                 except ValueError as e:
-                    # Print out the problematic line for debugging
                     print(f"Error parsing line: {line}")
                     print(f"Error: {e}")
                     continue  # Skip the problematic line and continue processing
+    else:
+        print(f"No existing data found at {file_path}. Starting fresh.")
     return existing_scores, existing_counts, existing_wins, existing_losses, existing_draws, total_button_presses
 
+# Define the output folder globally
+output_folder = os.path.join(image_folder, "results")
+snapshot_folder = os.path.join(output_folder, "ranking_snapshots")  # New folder for snapshots
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
+    print(f"Created directory: {output_folder}")
+if not os.path.exists(snapshot_folder):
+    os.makedirs(snapshot_folder)
+    print(f"Created directory for snapshots: {snapshot_folder}")
+
 # Load existing data at the start
-file_path = os.path.join(image_folder, "results", "sorted_crater_images.txt")
+file_path = os.path.join(output_folder, "sorted_crater_images.txt")
 existing_scores, existing_counts, existing_wins, existing_losses, existing_draws, total_button_presses = load_existing_data(file_path)
 
 # Initialize points dictionary to track scores, wins, losses, draws, and counts for each image
@@ -82,55 +103,102 @@ image_losses = existing_losses.copy()
 image_draws = existing_draws.copy()
 button_press_count = total_button_presses  # Continue from the last button press count
 
-# Function to initialize the main comparison window
-def initialize_interface():
-    # Configure grid to evenly distribute space
-    window.columnconfigure([0, 1, 2, 3], weight=1)
-    window.rowconfigure([0, 1], weight=1, minsize=100)
-    
-    # Load and display demonstration images with degradation levels
-    for i, path in enumerate(demo_image_paths):
-        demo_image = ImageTk.PhotoImage(Image.open(path).resize((100, 100)))
-        demo_label = tk.Label(window, image=demo_image)
-        demo_label.grid(row=0, column=i, padx=10, pady=10)
-        label_text = tk.Label(window, text=f"Level {i + 1}")
-        label_text.grid(row=1, column=i, padx=10, pady=5)
-        demo_label.image = demo_image  # Keep a reference to avoid garbage collection
+# Function to save the sorted sequence of craters with their scores
+def save_sorted_sequence():
+    try:
+        # Define the file path to save the sorted sequence
+        global output_folder
+        if not os.path.exists(output_folder):
+            os.makedirs(output_folder)
+            print(f"Created directory: {output_folder}")
 
-    # Create labels for the comparison images
-    global label1, label2, btn1, btn2, btn_same, btn_last_page, btn_next_page
-    label1 = tk.Label(window)
-    label1.grid(row=2, column=0, columnspan=2, padx=20, pady=10, sticky='e')
-    label2 = tk.Label(window)
-    label2.grid(row=2, column=2, columnspan=2, padx=20, pady=10, sticky='w')
+        file_path = os.path.join(output_folder, "sorted_crater_images.txt")
+        print(f"Saving sorted sequence to: {file_path}")  # Debugging
 
-    # Create buttons for selecting which image is more degraded or if both are similar
-    btn1 = tk.Button(window, text="Left is More Degraded", command=lambda: select_image(True))
-    btn1.grid(row=3, column=0, columnspan=2, padx=10, pady=10, sticky='e')
-    btn2 = tk.Button(window, text="Right is More Degraded", command=lambda: select_image(False))
-    btn2.grid(row=3, column=2, columnspan=2, padx=10, pady=10, sticky='w')
-    
-    # Add a button for "Both are Similarly Degraded"
-    btn_same = tk.Button(window, text="Both are Similarly Degraded", command=lambda: select_image(None))
-    btn_same.grid(row=4, column=1, columnspan=2, padx=10, pady=10)
+        # Sort images by their updated score in descending order
+        sorted_images = sorted(image_scores.items(), key=lambda x: x[1], reverse=True)
+        
+        # Write the updated scores, counts, wins, losses, draws, and total button presses back to the file
+        with open(file_path, "w") as file:
+            file.write(f"Total Button Presses: {button_press_count}\n\n")
+            for image_path, score in sorted_images:
+                # Extract and write the image name, updated score, sample count, wins, losses, and draws to the file
+                file.write(f"{os.path.basename(image_path)} - Score: {score} - Samples: {image_counts[image_path]} - Wins: {image_wins[image_path]} - Losses: {image_losses[image_path]} - Draws: {image_draws[image_path]}\n")
+        
+        # Confirm that the results are saved
+        print(f"Sorted sequence saved to {file_path}")
+    except Exception as e:
+        print(f"Error saving the sorted sequence: {e}")
 
-    # Reposition "Last Page" button to the same row as "Both are Similarly Degraded", at the very left side
-    btn_last_page = tk.Button(window, text="Last Page", command=last_page)
-    btn_last_page.grid(row=4, column=0, padx=10, pady=10, sticky='w')
+# Function to save rankings at regular intervals and compute variability
+def save_rankings_snapshot(count):
+    try:
+        global snapshot_folder
+        if not os.path.exists(snapshot_folder):
+            os.makedirs(snapshot_folder)
+            print(f"Created directory: {snapshot_folder}")
 
-    # Add "Next Page" button to the same row, at the very right side
-    btn_next_page = tk.Button(window, text="Next Page", command=next_page)
-    btn_next_page.grid(row=4, column=3, padx=10, pady=10, sticky='e')
+        # Sort images by their scores
+        sorted_images = sorted(image_scores.items(), key=lambda x: x[1], reverse=True)
+        # Store the ranking (list of image paths)
+        ranking = [img[0] for img in sorted_images]
+        # Map image paths to ranks
+        current_ranks = {img_path: rank for rank, img_path in enumerate(ranking)}
+        # Append to ranking_history
+        ranking_history.append((count, current_ranks))
 
-    # Start the first comparison
-    next_page()
-    
-    # Save data when the window is closed
-    def on_closing():
-        save_sorted_sequence()  # Save the data before exiting
-        window.destroy()  # Close the window
+        # Compute variability if there's a previous ranking
+        if len(ranking_history) > 1:
+            prev_count, prev_ranks = ranking_history[-2]
+            # Create arrays of ranks
+            ranks_current = []
+            ranks_previous = []
+            for img_path in crater_images:
+                rank_current = current_ranks.get(img_path, len(crater_images))
+                rank_previous = prev_ranks.get(img_path, len(crater_images))
+                ranks_current.append(rank_current)
+                ranks_previous.append(rank_previous)
+            # Compute Spearman's rho
+            rho, _ = spearmanr(ranks_current, ranks_previous)
+            variability = 1 - rho  # Variability inversely related to correlation
+            # Append to variability_list
+            variability_list.append((count, variability))
+            print(f"At {count} comparisons, variability is {variability}")
 
-    window.protocol("WM_DELETE_WINDOW", on_closing)  # Trigger the on_closing function when the window is closed
+        # Save the ranking to a file in the snapshots folder
+        snapshot_file = os.path.join(snapshot_folder, f"ranking_snapshot_{count}.txt")
+        with open(snapshot_file, "w") as f:
+            for rank, img_path in enumerate(ranking):
+                f.write(f"{rank+1},{os.path.basename(img_path)},{image_scores[img_path]}\n")
+        print(f"Saved ranking snapshot at {count} button presses to {snapshot_file}")
+    except Exception as e:
+        print(f"Error in save_rankings_snapshot: {e}")
+
+# Function to update and save the variability plot in the results folder
+def update_variability_plot():
+    try:
+        if not variability_list:
+            print("No variability data to plot.")
+            return
+
+        counts = [item[0] for item in variability_list]
+        variabilities = [item[1] for item in variability_list]
+
+        ax.clear()
+        ax.plot(counts, variabilities, marker='o', linestyle='-')
+        ax.set_title('Crater Ranking Stability Over Time')
+        ax.set_xlabel('Number of Comparisons')
+        ax.set_ylabel('Ranking Variability\n(1 - Spearman\'s rho)')
+        ax.grid(True)
+        canvas.draw()
+
+        # Save the variability plot in the results folder
+        plot_file_path = os.path.join(output_folder, "ranking_stability_plot.png")
+        fig.savefig(plot_file_path)
+        print(f"Saved variability plot to {plot_file_path}")
+        
+    except Exception as e:
+        print(f"Error in update_variability_plot: {e}")
 
 # Function to update the images for comparison
 def update_comparison():
@@ -142,15 +210,97 @@ def update_comparison():
     current_right_image = os.path.abspath(current_comparison['img2'])
 
     # Load and display images
-    image1 = ImageTk.PhotoImage(Image.open(current_left_image).resize((200, 200)))
-    image2 = ImageTk.PhotoImage(Image.open(current_right_image).resize((200, 200)))
-    label1.config(image=image1)
-    label2.config(image=image2)
-    label1.image = image1  # Keep a reference to avoid garbage collection
-    label2.image = image2  # Keep a reference to avoid garbage collection
+    try:
+        image1 = ImageTk.PhotoImage(Image.open(current_left_image).resize((250, 250)))
+        image2 = ImageTk.PhotoImage(Image.open(current_right_image).resize((250, 250)))
+        label1.config(image=image1)
+        label2.config(image=image2)
+        label1.image = image1  # Keep a reference to avoid garbage collection
+        label2.image = image2  # Keep a reference to avoid garbage collection
+    except Exception as e:
+        print(f"Error loading images: {e}")
 
     # Update button states
     update_navigation_buttons()
+def initialize_interface():
+    window.columnconfigure(0, weight=1)
+    window.columnconfigure(1, weight=4)
+    window.columnconfigure(2, weight=4)
+    window.columnconfigure(3, weight=4)
+    window.rowconfigure([0, 1, 2, 3, 4, 5], weight=1)
+
+    # Frame for demonstration images
+    demo_frame = tk.Frame(window)
+    demo_frame.grid(row=0, column=0, rowspan=6, sticky='ns')
+    
+    # Load and display demonstration images with degradation levels
+    for i, path in enumerate(demo_image_paths):
+        if os.path.exists(path):
+            demo_image = ImageTk.PhotoImage(Image.open(path).resize((80, 80)))
+            demo_label = tk.Label(demo_frame, image=demo_image)
+            demo_label.grid(row=i, column=0, padx=5, pady=5)
+            label_text = tk.Label(demo_frame, text=f"Level {i + 1}")
+            label_text.grid(row=i, column=1, padx=5, pady=5)
+            demo_label.image = demo_image
+        else:
+            print(f"Demo image not found: {path}")
+
+    # Create labels for the comparison images
+    global label1, label2, btn1, btn2, btn_same, btn_last_page, btn_next_page
+    label1 = tk.Label(window)
+    label1.grid(row=0, column=1, columnspan=1, padx=10, pady=10)
+    label2 = tk.Label(window)
+    label2.grid(row=0, column=2, columnspan=1, padx=10, pady=10)
+
+    # Create buttons for selecting which image is more degraded or if both are similar
+    button_frame = tk.Frame(window)
+    button_frame.grid(row=1, column=1, columnspan=2, pady=10)
+
+    btn1 = tk.Button(button_frame, text="Left is More Degraded", command=lambda: select_image(True), width=20)
+    btn1.grid(row=0, column=0, padx=5, pady=5)
+    btn2 = tk.Button(button_frame, text="Right is More Degraded", command=lambda: select_image(False), width=20)
+    btn2.grid(row=0, column=1, padx=5, pady=5)
+
+    # Place the "Both are Similarly Degraded" button below the other two buttons
+    btn_same = tk.Button(button_frame, text="Both are Similarly Degraded", command=lambda: select_image(None), width=25)
+    btn_same.grid(row=1, column=0, columnspan=2, padx=5, pady=5)
+
+    # Navigation buttons
+    nav_frame = tk.Frame(window)
+    nav_frame.grid(row=2, column=1, columnspan=2, pady=5)
+
+    btn_last_page = tk.Button(nav_frame, text="Last Page", command=last_page, width=15)
+    btn_last_page.grid(row=0, column=0, padx=5, pady=5)
+    btn_next_page = tk.Button(nav_frame, text="Next Page", command=next_page, width=15)
+    btn_next_page.grid(row=0, column=1, padx=5, pady=5)
+
+    # Create a frame for the variability plot
+    global plot_frame, canvas, ax, fig
+    plot_frame = tk.Frame(window)
+    plot_frame.grid(row=0, column=3, rowspan=6, padx=10, pady=10, sticky='nsew')
+
+    # Initialize the plot
+    fig = Figure(figsize=(5, 5), dpi=100)
+    ax = fig.add_subplot(111)
+    ax.set_title('Crater Ranking Stability Over Time')
+    ax.set_xlabel('Number of Comparisons')
+    ax.set_ylabel('Ranking Variability\n(1 - Spearman\'s rho)', labelpad=10)  # Add padding to y-label
+    ax.grid(True)
+    fig.subplots_adjust(left=0.15)  # Adjust the left margin for better y-label visibility
+    canvas = FigureCanvasTkAgg(fig, master=plot_frame)
+    canvas.draw()
+    canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+    # Start the first comparison
+    next_page()
+    
+    # Save data when the window is closed
+    def on_closing():
+        print("Closing the application...")
+        save_sorted_sequence()  # Save the data before exiting
+        window.destroy()
+
+    window.protocol("WM_DELETE_WINDOW", on_closing)
 
 # Function to handle the user's decision and proceed
 def select_image(is_left_more_degraded):
@@ -189,10 +339,16 @@ def select_image(is_left_more_degraded):
 
     button_press_count += 1  # Increment the button press counter
 
-    print(f'Scores updated: {current_left_image}: {image_scores[current_left_image]}, {current_right_image}: {image_scores[current_right_image]}')
-    print(f'Wins/Losses/Draws updated: {current_left_image}: {image_wins[current_left_image]}/{image_losses[current_left_image]}/{image_draws[current_left_image]}, {current_right_image}: {image_wins[current_right_image]}/{image_losses[current_right_image]}/{image_draws[current_right_image]}')
-    print(f'Sample counts updated: {current_left_image}: {image_counts[current_left_image]}, {current_right_image}: {image_counts[current_right_image]}')
+    print(f'Scores updated: {os.path.basename(current_left_image)}: {image_scores[current_left_image]}, {os.path.basename(current_right_image)}: {image_scores[current_right_image]}')
+    print(f'Wins/Losses/Draws updated: {os.path.basename(current_left_image)}: {image_wins[current_left_image]}/{image_losses[current_left_image]}/{image_draws[current_left_image]}, {os.path.basename(current_right_image)}: {image_wins[current_right_image]}/{image_losses[current_right_image]}/{image_draws[current_right_image]}')
+    print(f'Sample counts updated: {os.path.basename(current_left_image)}: {image_counts[current_left_image]}, {os.path.basename(current_right_image)}: {image_counts[current_right_image]}')
     print(f'Button pressed {button_press_count} times.')
+
+    # Save rankings every N button presses
+    N = 1  # Set N to 1 to update variability plot after each click
+    if button_press_count % N == 0:
+        save_rankings_snapshot(button_press_count)
+        update_variability_plot()  # Update the plot in the GUI
 
     # Save results immediately after each button press
     save_sorted_sequence()
@@ -268,32 +424,6 @@ def update_navigation_buttons():
         btn_next_page.config(state=tk.DISABLED)
     else:
         btn_next_page.config(state=tk.NORMAL)
-
-# Function to save the sorted sequence of craters with their scores
-def save_sorted_sequence():
-    try:
-        # Define the file path to save the sorted sequence
-        output_folder = os.path.join(image_folder, "results")
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
-            print(f"Created directory: {output_folder}")
-
-        file_path = os.path.join(output_folder, "sorted_crater_images.txt")
-
-        # Sort images by their updated score in descending order
-        sorted_images = sorted(image_scores.items(), key=lambda x: x[1], reverse=True)
-        
-        # Write the updated scores, counts, wins, losses, draws, and total button presses back to the file
-        with open(file_path, "w") as file:
-            file.write(f"Total Button Presses: {button_press_count}\n\n")
-            for image_path, score in sorted_images:
-                # Extract and write the image name, updated score, sample count, wins, losses, and draws to the file
-                file.write(f"{os.path.basename(image_path)} - Score: {score} - Samples: {image_counts[image_path]} - Wins: {image_wins[image_path]} - Losses: {image_losses[image_path]} - Draws: {image_draws[image_path]}\n")
-        
-        # Confirm that the results are saved
-        print(f"Sorted sequence saved to {file_path}")
-    except Exception as e:
-        print(f"Error saving the sorted sequence: {e}")
 
 # Initialize the interface and start the application
 initialize_interface()
