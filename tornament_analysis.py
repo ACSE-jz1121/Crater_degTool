@@ -345,7 +345,7 @@ def select_image(is_left_more_degraded):
     print(f'Button pressed {button_press_count} times.')
 
     # Save rankings every N button presses
-    N = 1  # Set N to 1 to update variability plot after each click
+    N = 15  # Set N to 5 to update variability plot after each click
     if button_press_count % N == 0:
         save_rankings_snapshot(button_press_count)
         update_variability_plot()  # Update the plot in the GUI
